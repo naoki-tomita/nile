@@ -39,38 +39,40 @@ router.get("/v1/systems/ping", (context) => {
   context.response.body = JSON.stringify({ ok: "ok" });
 });
 router.get("/v1/products", async (context) => {
+  context.response.headers.append("content-type", "application/json");
+
   const results = await client.queryObject<ProductHistory>`
     SELECT ph.product_id, ph.name, ph.version_number, ph.price FROM nile.product_history ph
       JOIN (SELECT product_id, MAX(version_number) as max_version_number FROM nile.product_history GROUP BY product_id) max
         ON max.product_id = ph.product_id AND max.max_version_number = ph.version_number;
   `;
-  context.response.headers.append("content-type", "application/json");
   context.response.body = JSON.stringify(results.rows.map(toProductJson));
 });
 router.get("/v1/products/:id", async (context) => {
+  context.response.headers.append("content-type", "application/json");
+
   const id = context.params.id;
   const results = await client.queryObject<ProductHistory>`
     SELECT * FROM nile.product_history ph
       JOIN (SELECT product_id, MAX(version_number) as max_version_number FROM nile.product_history GROUP BY product_id) max
         ON max.product_id = ph.product_id AND max.max_version_number = ph.version_number
-        WHERE ph.product_id = ${id};
+      WHERE ph.product_id = ${id};
   `;
   if ((results.rowCount ?? 0) > 0) {
     const result = results.rows[0];
-    context.response.headers.append("content-type", "application/json");
     context.response.body = JSON.stringify(toProductJson(result));
   } else {
     context.response.status = 404;
-    context.response.headers.append("content-type", "application/json");
     context.response.body = JSON.stringify({});
   }
 });
 router.post("/v1/products", async (context) => {
+  context.response.headers.append("content-type", "application/json");
+
   const id = crypto.randomUUID();
   const { name, price } = await context.request.body({ type: "json" }).value;
   if (name == null || price == null) {
     context.response.status = 400;
-    context.response.headers.append("content-type", "application/json");
     context.response.body = JSON.stringify({ errors: ["Parameter 'name' or 'price' not found."] });
     return;
   }
@@ -83,11 +85,12 @@ router.post("/v1/products", async (context) => {
   context.response.body = JSON.stringify({ id, name, price });
 });
 router.put("/v1/products/:id", async (context) => {
+  context.response.headers.append("content-type", "application/json");
+
   const id = context.params.id;
   const { name, price } = await context.request.body({ type: "json" }).value;
   if (name == null && price == null) {
     context.response.status = 400;
-    context.response.headers.append("content-type", "application/json");
     context.response.body = JSON.stringify({ errors: ["Parameter 'name' or 'price' not found."] });
     return;
   }
@@ -99,7 +102,6 @@ router.put("/v1/products/:id", async (context) => {
   `;
   if ((latestData.rowCount ?? 0) === 0) {
     context.response.status = 400;
-    context.response.headers.append("content-type", "application/json");
     context.response.body = JSON.stringify({ errors: ["Parameter 'name' or 'price' not found."] });
     return;
   }
@@ -110,7 +112,6 @@ router.put("/v1/products/:id", async (context) => {
       VALUES(${id}, ${name ?? latestName}, ${version_number + 1}, ${price ?? latestPrice});
   `;
 
-  context.response.headers.append("content-type", "application/json");
   context.response.body = JSON.stringify({});
 });
 
