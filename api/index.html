@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nile</title>
+  <script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/5.3.0/react-router-dom.min.js"></script>
+  <script crossorigin src="https://unpkg.com/babel-standalone@6.26.0/babel.min.js"></script>
+</head>
+<body>
+  <script type="text/babel">
+    const React = window.React;
+    const ReactDOM = window.ReactDOM;
+    const { HashRouter: Router, Switch, Route, Link, useParams } = window.ReactRouterDOM;
+    const { useState, useEffect } = React;
+
+    const App = () => {
+      return (
+        <Router>
+          <Switch>
+            <Route path="/products/:id">
+              <ProductPage />
+            </Route>
+            <Route path="/products">
+              <ProductsPage />
+            </Route>
+          </Switch>
+        </Router>
+      );
+    }
+
+    const ProductPage = () => {
+      const { id } = useParams();
+      const [product, setProduct] = useState({});
+
+      useEffect(() => {
+        fetch(`/v1/products/${id}`)
+          .then(it => it.json())
+          .then(it => setProduct(it));
+      }, [id]);
+
+      return (
+        <div>
+          <h1>{product.name}</h1>
+          <h2>{product.price}円</h2>
+        </div>
+      );
+    }
+
+    const ProductsPage = () => {
+      const [products, setProducts] = useState([]);
+
+      useEffect(() => {
+        fetch("/v1/products")
+          .then(it => it.json())
+          .then(it => setProducts(it));
+      }, []);
+
+      return (
+        <div>
+          <h1>商品一覧</h1>
+          <ProductList products={products} />
+        </div>
+      );
+    }
+
+    const ProductList = ({ products }) => {
+      return (
+        <ul>{
+          products.map(it => <ProductListItem product={it} />)
+        }</ul>
+      );
+    }
+    const ProductListItem = ({ product }) => {
+      return (
+        <li><Link to={`/products/${product.id}`}>{product.name}</Link>: {product.price}円</li>
+      );
+    }
+    ReactDOM.render(<App />, document.body);
+  </script>
+</body>
+</html>

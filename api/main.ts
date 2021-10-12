@@ -29,12 +29,16 @@ function toProductJson(productHistory: ProductHistory) {
   }
 }
 
+router.get("/", async (context) => {
+  context.response.headers.append("content-type", "text/html");
+  context.response.body = await Deno.readTextFile("./index.html")
+});
 
-router.get("/systems/ping", (context) => {
+router.get("/v1/systems/ping", (context) => {
   context.response.headers.append("content-type", "application/json");
   context.response.body = JSON.stringify({ ok: "ok" });
 });
-router.get("/products", async (context) => {
+router.get("/v1/products", async (context) => {
   const results = await client.queryObject<ProductHistory>`
     SELECT ph.product_id, ph.name, ph.version_number, ph.price FROM nile.product_history ph
       JOIN (SELECT product_id, MAX(version_number) as max_version_number FROM nile.product_history GROUP BY product_id) max
@@ -43,7 +47,7 @@ router.get("/products", async (context) => {
   context.response.headers.append("content-type", "application/json");
   context.response.body = JSON.stringify(results.rows.map(toProductJson));
 });
-router.get("/products/:id", async (context) => {
+router.get("/v1/products/:id", async (context) => {
   const id = context.params.id;
   const results = await client.queryObject<ProductHistory>`
     SELECT * FROM nile.product_history ph
@@ -61,7 +65,7 @@ router.get("/products/:id", async (context) => {
     context.response.body = JSON.stringify({});
   }
 });
-router.post("/products", async (context) => {
+router.post("/v1/products", async (context) => {
   const id = crypto.randomUUID();
   const { name, price } = await context.request.body({ type: "json" }).value;
   if (name == null || price == null) {
@@ -78,7 +82,7 @@ router.post("/products", async (context) => {
   `;
   context.response.body = JSON.stringify({ id, name, price });
 });
-router.put("/products/:id", async (context) => {
+router.put("/v1/products/:id", async (context) => {
   const id = context.params.id;
   const { name, price } = await context.request.body({ type: "json" }).value;
   if (name == null && price == null) {
