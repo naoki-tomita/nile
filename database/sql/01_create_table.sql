@@ -1,5 +1,6 @@
 CREATE TABLE nile.product(
-  id UUID PRIMARY KEY
+  id UUID PRIMARY KEY,
+  count INTEGER NOT NULL
 );
 
 CREATE TABLE nile.product_history(

@@ -5,6 +5,7 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nile</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
   <script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/5.3.0/react-router-dom.min.js"></script>
@@ -14,13 +15,127 @@
   <script type="text/babel">
     const React = window.React;
     const ReactDOM = window.ReactDOM;
-    const { HashRouter: Router, Switch, Route, Link, useParams } = window.ReactRouterDOM;
-    const { useState, useEffect } = React;
+    const { HashRouter: Router, Switch, Route, Link, useParams, useLocation } = window.ReactRouterDOM;
+    const { useState, useEffect, useRef, useContext: useContextOriginal, createContext } = React;
+
+    const Context = createContext({});
+    function useContext() {
+      return useContextOriginal(Context);
+    }
+
+    const StoreProvider = ({ children }) => {
+      const nile = useNile("c9ea736e-4c65-4357-a4ea-bda7c174e70a");
+      return (
+        <Context.Provider value={nile}>{children}</Context.Provider>
+      );
+    }
+
+    function useNile(userId) {
+      const [products, setProducts] = useState([]);
+      const [product, setProduct] = useState({});
+      const [cartItems, setCartItems] = useState([]);
+      useEffect(() => {
+        loadProducts();
+        loadCart();
+      }, []);
+
+      async function loadProducts() {
+        await fetch("/v1/products")
+          .then(it => it.json())
+          .then(setProducts);
+      };
+      async function loadProduct(id) {
+        await fetch(`/v1/products/${id}`)
+          .then(it => it.json())
+          .then(setProduct);
+      };
+      async function loadCart() {
+        await fetch("/v1/carts", { headers: { "x-user-id": userId } })
+          .then(it => it.json())
+          .then(setCartItems);
+      };
+      async function addCart(id) {
+        await fetch("/v1/carts", {
+          method: "POST",
+          headers: {
+            "x-user-id": userId,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ id, count: 1 }),
+        });
+        loadCart();
+      }
+      async function addProduct(name, price, count) {
+        await fetch("/v1/products", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name, price, count }),
+        });
+        loadProducts();
+      };
+      async function removeProduct(id) {
+        await fetch(`/v1/products/${id}`, { method: "DELETE" });
+        loadProducts();
+      }
+      async function removeCartProduct(id) {
+        await fetch(`/v1/carts/${id}`, {
+          method: "DELETE",
+          headers: { "x-user-id": userId }
+        });
+        loadCart();
+      }
+
+      return {
+        products, product, cartItems,
+        loadProducts, loadProduct, loadCart,
+        addCart, addProduct,
+        removeProduct, removeCartProduct,
+      }
+    }
+
+    function formatPrice(number = 0) {
+      const numberStr = number.toString();
+      return numberStr
+        .split("")
+        .reduceRight((prev, next, i) => `${next}${((numberStr.length - i - 1) % 3 === 0) ? "," : ""}${prev}`, "")
+        .split("")
+        .slice(0, -1)
+        .join("");
+    }
+
+    const Wrapper = () => {
+      return (
+        <StoreProvider>
+          <App />
+        </StoreProvider>
+      );
+    }
 
     const App = () => {
+      const { cartItems, removeCartProduct } = useContext();
       return (
         <Router>
+          <header>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <h1 style={{ background: "var(--background-alt)", padding: "12px 64px", borderRadius: "8px" }}>
+                <Link to="/products">Nile</Link>
+              </h1>
+              <div>
+                <ul>
+                  {cartItems.map(it =>
+                    <li style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      {it.name}
+                      <button onClick={() => removeCartProduct(it.id)} style={{ margin: 0, padding: "4px 8px", fontSize: 10 }}>削除</button>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </header>
           <Switch>
+            <Route path="/managements/products">
+              <ProductManagementPage />
+            </Route>
             <Route path="/products/:id">
               <ProductPage />
             </Route>
@@ -32,32 +147,98 @@
       );
     }
 
+    const ProductManagementPage = () => {
+      const { products, removeProduct } = useContext();
+      const ref = useRef(null);
+
+      return (
+        <div>
+          <ProductRegisterDialog refs={ref} />
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button onClick={() => ref.current.showModal()}>追加</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>名前</th>
+                <th>価格</th>
+                <th>個数</th>
+                <th style={{ textAlign: "center" }}>更新</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map(it =>
+                <tr>
+                  <td>{it.name}</td>
+                  <td>{formatPrice(it.price)}</td>
+                  <td>{it.count}</td>
+                  <td style={{ textAlign: "center" }}><button onClick={() => removeProduct(it.id)}>削除</button></td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    const ProductRegisterDialog = ({ refs }) => {
+      const [name, setName] = useState("")
+      const [price, setPrice] = useState(0);
+      const [count, setCount] = useState(0);
+      const { addProduct } = useContext();
+      async function register() {
+        await addProduct(name, price, count);
+        close();
+      }
+
+      function close() {
+        setName("");
+        setPrice(0);
+        setCount(0);
+        refs.current.close();
+      }
+
+      return (
+        <dialog ref={refs}>
+          <header>商品を追加する</header>
+          <form onSubmit={e => {e.preventDefault();}} style={{ width: 320 }}>
+            <label>名前</label>
+            <input value={name} onChange={e => setName(e.target.value)} style={{ width: "100%", boxSizing: "border-box" }}/>
+            <label>価格</label>
+            <input type="number" value={price} onChange={e => setPrice(Number.parseInt(e.target.value))} style={{ width: "100%", boxSizing: "border-box" }}/>
+            <label>個数</label>
+            <input type="number" value={count} onChange={e => setCount(Number.parseInt(e.target.value))} style={{ width: "100%", boxSizing: "border-box" }}/>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => close()} style={{ margin: 0 }}>閉じる</button>
+              <button onClick={() => register()} style={{ margin: 0 }} disabled={!name}>登録</button>
+            </div>
+            </form>
+        </dialog>
+      );
+    }
+
     const ProductPage = () => {
       const { id } = useParams();
-      const [product, setProduct] = useState({});
+      const { addCart, product, loadProduct } = useContext();
 
       useEffect(() => {
-        fetch(`/v1/products/${id}`)
-          .then(it => it.json())
-          .then(it => setProduct(it));
+        loadProduct(id);
       }, [id]);
 
       return (
         <div>
-          <h1>{product.name}</h1>
-          <h2>{product.price}円</h2>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <h2>{product.name}</h2>
+            <button onClick={() => addCart(id)}>カートに追加</button>
+          </div>
+          <h3>{formatPrice(product.price)}円</h3>
+          <p>残り{product.count}個</p>
         </div>
       );
     }
 
     const ProductsPage = () => {
-      const [products, setProducts] = useState([]);
-
-      useEffect(() => {
-        fetch("/v1/products")
-          .then(it => it.json())
-          .then(it => setProducts(it));
-      }, []);
+      const { products } = useContext([]);
 
       return (
         <div>
@@ -69,17 +250,35 @@
 
     const ProductList = ({ products }) => {
       return (
-        <ul>{
-          products.map(it => <ProductListItem product={it} />)
-        }</ul>
+        <table>
+          <thead>
+            <tr>
+              <th>商品名</th>
+              <th>価格</th>
+              <th>在庫数</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map(it => <ProductListItem product={it} />)}
+          </tbody>
+        </table>
       );
     }
     const ProductListItem = ({ product }) => {
+      async function deleteItem() {
+        await fetch(`/v1/products/${product.id}`, { method: "DELETE" });
+        location.reload();
+      }
+
       return (
-        <li><Link to={`/products/${product.id}`}>{product.name}</Link>: {product.price}円</li>
+        <tr>
+          <td><Link to={`/products/${product.id}`}>{product.name}</Link></td>
+          <td>{formatPrice(product.price)}円</td>
+          <td>{product.count}個</td>
+        </tr>
       );
     }
-    ReactDOM.render(<App />, document.body);
+    ReactDOM.render(<Wrapper />, document.body);
   </script>
 </body>
 </html>
