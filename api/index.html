@@ -111,8 +111,45 @@
       );
     }
 
-    const App = () => {
+    const Popup = ({ label, children }) => {
+      const [open, setOpen] = useState(false);
+      return (
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setOpen(!open)}>{label}▼</button>
+          {open &&
+          <div style={{ position: "absolute", right: 0 }}>
+            {children}
+          </div>}
+        </div>
+      );
+    }
+
+    const Cart = () => {
       const { cartItems, removeCartProduct } = useContext();
+      return (
+        <div style={{
+          background: "var(--background)",
+          padding: "16px 24px",
+          borderRadius: 8,
+          boxShadow: `0px 8px 16px -2px rgba(10,10,10,0.1),
+                      0px 0px 0px 1px rgba(10,10,10,0.02)` }}>
+          <ul style={{ padding: 0, margin: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, width: 200 }}>
+            {cartItems.map(it =>
+              <li style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                <span>{it.name}</span>
+                <button
+                  onClick={() => removeCartProduct(it.id)}
+                  style={{ margin: 0, padding: "4px 8px", fontSize: 10 }}
+                >削除</button>
+              </li>
+            )}
+          </ul>
+        </div>
+      );
+    };
+
+    const App = () => {
+      const { cartItems } = useContext();
       return (
         <Router>
           <header>
@@ -120,16 +157,9 @@
               <h1 style={{ background: "var(--background-alt)", padding: "12px 64px", borderRadius: "8px" }}>
                 <Link to="/products">Nile</Link>
               </h1>
-              <div>
-                <ul>
-                  {cartItems.map(it =>
-                    <li style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {it.name}
-                      <button onClick={() => removeCartProduct(it.id)} style={{ margin: 0, padding: "4px 8px", fontSize: 10 }}>削除</button>
-                    </li>
-                  )}
-                </ul>
-              </div>
+              <Popup label={`カート (${cartItems.length})`}>
+                <Cart />
+              </Popup>
             </div>
           </header>
           <Switch>
