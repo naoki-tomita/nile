@@ -24,7 +24,7 @@
     }
 
     const StoreProvider = ({ children }) => {
-      const nile = useNile("c9ea736e-4c65-4357-a4ea-bda7c174e70a");
+      const nile = useNile("0cc256bf-ddf2-4edd-a757-fd822ec0d60b");
       return (
         <Context.Provider value={nile}>{children}</Context.Provider>
       );
@@ -34,9 +34,11 @@
       const [products, setProducts] = useState([]);
       const [product, setProduct] = useState({});
       const [cartItems, setCartItems] = useState([]);
+      const [orders, setOrders] = useState([]);
       useEffect(() => {
         loadProducts();
         loadCart();
+        loadOrders();
       }, []);
 
       async function loadProducts() {
@@ -54,6 +56,11 @@
           .then(it => it.json())
           .then(setCartItems);
       };
+      async function loadOrders() {
+        await fetch("/v1/orders", { headers: { "x-user-id": userId } })
+          .then(it => it.json())
+          .then(setOrders);
+      }
       async function addCart(id) {
         await fetch("/v1/carts", {
           method: "POST",
@@ -73,6 +80,18 @@
         });
         loadProducts();
       };
+      async function createOrder() {
+        await fetch("/v1/orders", {
+          method: "POST",
+          headers: {
+            "x-user-id": userId,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({}),
+        });
+        loadOrders();
+        loadCart();
+      }
       async function removeProduct(id) {
         await fetch(`/v1/products/${id}`, { method: "DELETE" });
         loadProducts();
@@ -86,9 +105,9 @@
       }
 
       return {
-        products, product, cartItems,
+        products, product, cartItems, orders,
         loadProducts, loadProduct, loadCart,
-        addCart, addProduct,
+        addCart, addProduct, createOrder,
         removeProduct, removeCartProduct,
       }
     }
@@ -125,7 +144,7 @@
     }
 
     const Cart = () => {
-      const { cartItems, removeCartProduct } = useContext();
+      const { cartItems, removeCartProduct, createOrder } = useContext();
       return (
         <div style={{
           background: "var(--background)",
@@ -144,6 +163,12 @@
               </li>
             )}
           </ul>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              onClick={createOrder}
+              style={{ marginTop: 10 }}
+            >購入</button>
+          </div>
         </div>
       );
     };
@@ -172,8 +197,29 @@
             <Route path="/products">
               <ProductsPage />
             </Route>
+            <Route path="/orders">
+              <OrderListPage />
+            </Route>
           </Switch>
         </Router>
+      );
+    }
+
+    const OrderListPage = () => {
+      const { orders } = useContext();
+      return (
+        <div>
+          <ul>
+            {orders.map(it =>
+              <li>
+                {it.id}
+                <ul>
+                  {it.values.map(it => <li>{it.name}</li>)}
+                </ul>
+              </li>
+            )}
+          </ul>
+        </div>
       );
     }
 

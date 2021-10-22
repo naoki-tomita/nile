@@ -1,6 +1,7 @@
 CREATE TABLE nile.product(
-  id UUID PRIMARY KEY,
-  count INTEGER NOT NULL
+  id UUID,
+  count INTEGER NOT NULL,
+  PRIMARY KEY (id)
 );
 
 CREATE TABLE nile.product_history(
@@ -14,13 +15,15 @@ CREATE TABLE nile.product_history(
 );
 
 CREATE TABLE nile.user(
-  id UUID PRIMARY KEY,
-  name VARCHAR(100) NOT NULL
+  id UUID,
+  name VARCHAR(100) NOT NULL,
+  PRIMARY KEY (id)
 );
 
 CREATE TABLE nile.cart(
-  id UUID PRIMARY KEY,
+  id UUID,
   user_id UUID NOT NULL,
+  PRIMARY KEY (id),
   UNIQUE (user_id),
   FOREIGN KEY (user_id) REFERENCES nile.user(id)
 );
@@ -40,9 +43,10 @@ CREATE TABLE nile.cart_product(
 );
 
 CREATE TABLE nile.order(
-  id UUID PRIMARY KEY,
+  id UUID,
   user_id UUID NOT NULL,
   ordered_at TIMESTAMP NOT NULL,
+  PRIMARY KEY (id),
   FOREIGN KEY (user_id) REFERENCES nile.user(id)
 );
 
@@ -70,11 +74,13 @@ CREATE TABLE nile.order_product(
 
 
 CREATE TABLE nile.delivery(
-  id UUID PRIMARY KEY,
+  id UUID,
   status VARCHAR(36) NOT NULL
+  PRIMARY KEY (id)
 );
 
 CREATE TABLE pharaoh.user(
-  id UUID PRIMARY KEY,
-  password VARCHAR(64) NOT NULL
+  id UUID,
+  password VARCHAR(64) NOT NULL,
+  PRIMARY KEY (id)
 );
