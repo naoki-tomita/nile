@@ -235,7 +235,7 @@ router.post("/v1/users", async (context) => {
     await transaction.queryObject`
       INSERT INTO nile.user (id, name) VALUES(${id}, ${name});`;
     await transaction.queryObject`
-      INSERT INTO nile.cart (id, user_id) VALUES(${id}, ${id})`;
+      INSERT INTO nile.cart (id, user_id) VALUES(${id}, ${id});`;
   });
 
   context.response.body = JSON.stringify({ id, name });
@@ -262,7 +262,7 @@ router.post("/v1/orders", async (context) => {
           WHERE c.user_id = ${userId};`;
     await transaction.queryObject`
       DELETE FROM nile.cart_product
-        WHERE cart_id in (SELECT id FROM nile.cart WHERE user_id = ${userId})`;
+        WHERE cart_id in (SELECT id FROM nile.cart WHERE user_id = ${userId});`;
   });
   context.response.body = JSON.stringify({ id });
 });
@@ -295,6 +295,7 @@ router.get("/v1/orders", async (context) => {
 function log(context: Context, text: string) {
   console.log(`[${Date.now()}] [${context.state.id}]`, text);
 }
+
 function error(context: Context, text: string) {
   console.error(`[${Date.now()}] [${context.state.id}]`, text);
 }
@@ -305,12 +306,10 @@ function random(size: number) {
     Chars[Math.floor(Math.random() * Chars.length)]
   ).join("");
 }
+
 app.use(async (context, next) => {
   context.state.id = random(5);
-  log(
-    context,
-    `${context.request.method.toUpperCase()} ${context.request.url}`,
-  );
+  log(context, `${context.request.method.toUpperCase()} ${context.request.url}`);
   const start = Date.now();
   context.response.headers.set("content-type", "application/json");
   try {
