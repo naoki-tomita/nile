@@ -64,12 +64,14 @@ router.get("/v1/systems/ping", (context) => {
 router.get("/v1/products", async (context) => {
   // 1 対 多のリクエストの場合は、1の方を SELECT * FROMにしたほうがいい
   // なぜ、出力するときに p.id とかすると怒られるのか
+  // ON max.product_id = p.id AND max.max_version_number = ph.version_number
+  // だと、p.idよりph.product_idの方が正しい。(p.idでも他の条件で絞り込めるので、問題はないはずだが、意味的におかしい)
   const results = await useClient((client) => {
     return client.queryObject`
-      SELECT id, name, count, price FROM nile.product p
+      SELECT p.id, name, count, price FROM nile.product p
         JOIN nile.product_history ph ON p.id = ph.product_id
-        JOIN (SELECT product_id, MAX(version_number) as max_version_number FROM nile.product_history GROUP BY product_id) max
-          ON max.product_id = p.id AND max.max_version_number = ph.version_number;`;
+        JOIN (SELECT ph1.product_id, MAX(ph1.version_number) as max_version_number FROM nile.product_history ph1 GROUP BY ph1.product_id) max
+          ON max.product_id = ph.product_id AND max.max_version_number = ph.version_number;`;
   });
 
   context.response.body = JSON.stringify(results.rows);
@@ -82,7 +84,7 @@ router.get("/v1/products/:id", async (context) => {
       SELECT id, name, count, price FROM nile.product p
         JOIN nile.product_history ph ON p.id = ph.product_id
         JOIN (SELECT product_id, MAX(version_number) as max_version_number FROM nile.product_history GROUP BY product_id) max
-          ON max.product_id = p.id AND max.max_version_number = ph.version_number
+          ON max.product_id = ph.product_id AND max.max_version_number = ph.version_number
         WHERE p.id = ${id};`;
   });
   if ((results.rowCount ?? 0) > 0) {
@@ -126,6 +128,7 @@ router.put("/v1/products/:id", async (context) => {
     return;
   }
 
+  // PUT /v1/products/${id} -d { name?, price?, count? }
   await useTransaction(async (transaction) => {
     if (count != null) {
       await transaction.queryObject`
@@ -133,27 +136,17 @@ router.put("/v1/products/:id", async (context) => {
       `;
     }
     if (name != null || price != null) {
-      const latestData = await transaction.queryObject<Record<string, string>>`
-        SELECT p1.product_id as id, p1.name, p1.price, p1.count FROM nile.product_history p1
-          JOIN (SELECT product_id, MAX(version_number) max_version FROM nile.product_history GROUP BY product_id) p2
-            ON p1.product_id = p2.product_id AND p1.version_number = p2.max_version
-          WHERE p1.product_id = ${id};
-      `;
-      if ((latestData.rowCount ?? 0) === 0) {
-        context.response.status = 404;
-        context.response.body = JSON.stringify({
-          errors: [`Product id(${id}) is not found.`],
-        });
-        return;
-      }
-      // deno-lint-ignore camelcase
-      const { name: latestName, price: latestPrice, version_number } =
-        latestData.rows[0];
-      await transaction.queryObject`
+      await transaction.queryObject(`
         INSERT INTO nile.product_history (product_id, name, version_number, price)
-          VALUES(${id}, ${name ?? latestName}, ${version_number + 1}, ${price ??
-        latestPrice});
-      `;
+          SELECT
+            p1.product_id as id,
+            ${name != null ? `'${name}'` : "p1.name"} as name,
+            p1.version_number + 1 as version_number,
+            ${price != null ? `'${price}'` : "p1.price"} as price
+          FROM nile.product_history p1
+            JOIN (SELECT product_id, MAX(version_number) max_version FROM nile.product_history GROUP BY product_id) p2
+              ON p1.product_id = p2.product_id AND p1.version_number = p2.max_version
+            WHERE p1.product_id = '${id}'`);
     }
   });
 
